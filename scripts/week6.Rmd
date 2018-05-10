@@ -62,38 +62,6 @@ dt[, `freqCity` := .N, by = City]
 dt[, `freqCountry` := .N, by = Country]   ## not used further so far
 ```
 
-Histograms for Countries and Cities
------------------------------------
-
-Not filtered. Needs works.
-```{r}
-#p1 <- ggplot(data=dtsort, aes(x = Country)) + geom_bar() 
-
-top_countries <- data %>% 
-  group_by(Country) %>% 
-  summarise(n = n()) %>%
-  arrange(desc(n)) %>%
-  filter(n > 1)
-
-p1 <- ggplot(data=top_countries, aes(x = reorder(Country, -n), y = n)) +
-  geom_bar(stat = "identity") +
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) #+
-  #scale_y_log10()
-p1
-
-##
-
-top_cities <- data %>% 
-  group_by(City) %>% 
-  summarise(n = n()) %>%
-  arrange(desc(n)) %>%
-  filter(n > 1)
-
-p2 <- ggplot(data=top_cities, aes(x = reorder(City, -n), y = n)) + 
-  geom_bar(stat = "identity")
-p2
-```
-
 
 Mapping
 =======

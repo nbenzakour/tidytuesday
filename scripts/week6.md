@@ -328,45 +328,6 @@ dt[, `freqCountry` := .N, by = Country]   ## not used further so far
 ## 25600:        1           3
 ```
 
-Histograms for Countries and Cities
------------------------------------
-
-Not filtered. Needs works.
-
-```r
-#p1 <- ggplot(data=dtsort, aes(x = Country)) + geom_bar() 
-
-top_countries <- data %>% 
-  group_by(Country) %>% 
-  summarise(n = n()) %>%
-  arrange(desc(n)) %>%
-  filter(n > 1)
-
-p1 <- ggplot(data=top_countries, aes(x = reorder(Country, -n), y = n)) +
-  geom_bar(stat = "identity") +
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) #+
-  #scale_y_log10()
-p1
-```
-
-![](week-6_figs/week-6_unnamed-chunk-5-1.png)<!-- -->
-
-```r
-##
-
-top_cities <- data %>% 
-  group_by(City) %>% 
-  summarise(n = n()) %>%
-  arrange(desc(n)) %>%
-  filter(n > 1)
-
-p2 <- ggplot(data=top_cities, aes(x = reorder(City, -n), y = n)) + 
-  geom_bar(stat = "identity")
-p2
-```
-
-![](week-6_figs/week-6_unnamed-chunk-5-2.png)<!-- -->
-
 
 Mapping
 =======
@@ -382,7 +343,7 @@ plot(newmap)
 points(data$Longitude, dt$Latitude, col = "red", cex = .1)
 ```
 
-![](week-6_figs/week-6_unnamed-chunk-6-1.png)<!-- -->
+![](week-6_figs/week-6_unnamed-chunk-5-1.png)<!-- -->
 
 Adding bubbles colored by count of Starbucks per city. 
 ------------------------------------------------------
@@ -410,7 +371,7 @@ mapBubbles(dt, nameX='Longitude', nameY='Latitude', nameZSize='freqCity', nameZC
 ## categories, you may want to try a different catMethod, e.g. quantile
 ```
 
-![](week-6_figs/week-6_unnamed-chunk-7-1.png)<!-- -->
+![](week-6_figs/week-6_unnamed-chunk-6-1.png)<!-- -->
 
 ```r
 ### issues
@@ -429,7 +390,7 @@ p1 <- ggplot() +
 p1
 ```
 
-![](week-6_figs/week-6_unnamed-chunk-8-1.png)<!-- -->
+![](week-6_figs/week-6_unnamed-chunk-7-1.png)<!-- -->
 
 ```r
 p2 <- ggplot(world_map, aes(x=long, y=lat, group=group)) +
@@ -439,7 +400,7 @@ p2 <- ggplot(world_map, aes(x=long, y=lat, group=group)) +
 p2
 ```
 
-![](week-6_figs/week-6_unnamed-chunk-8-2.png)<!-- -->
+![](week-6_figs/week-6_unnamed-chunk-7-2.png)<!-- -->
 
 
 ```r
@@ -456,7 +417,7 @@ p1
 ## Warning: Removed 1 rows containing missing values (geom_point).
 ```
 
-![](week-6_figs/week-6_unnamed-chunk-9-1.png)<!-- -->
+![](week-6_figs/week-6_unnamed-chunk-8-1.png)<!-- -->
 
 ```r
 ## filter usa data only
@@ -467,7 +428,7 @@ p2 <- ggplot() + geom_polygon(data=world_map,aes(x=long, y=lat,group=group)) + s
 p2
 ```
 
-![](week-6_figs/week-6_unnamed-chunk-9-2.png)<!-- -->
+![](week-6_figs/week-6_unnamed-chunk-8-2.png)<!-- -->
 
 ```r
 ## usa map only
@@ -475,7 +436,7 @@ p3 <- ggplot() + geom_polygon(data=map_data("usa"),aes(x=long, y=lat,group=group
 p3
 ```
 
-![](week-6_figs/week-6_unnamed-chunk-9-3.png)<!-- -->
+![](week-6_figs/week-6_unnamed-chunk-8-3.png)<!-- -->
 
 
 Testing ggmap
@@ -510,7 +471,7 @@ p1
 ## Warning: Removed 8963 rows containing missing values (geom_point).
 ```
 
-![](week-6_figs/week-6_unnamed-chunk-10-1.png)<!-- -->
+![](week-6_figs/week-6_unnamed-chunk-9-1.png)<!-- -->
 
 Testing density overlay with ggmap (USA focused)
 ------------------------------------------------
@@ -549,7 +510,7 @@ densi
 ## Warning: Removed 10153 rows containing missing values (geom_point).
 ```
 
-![](week-6_figs/week-6_unnamed-chunk-11-1.png)<!-- -->
+![](week-6_figs/week-6_unnamed-chunk-10-1.png)<!-- -->
 
 Testing density overlay with ggmap (China focused)
 --------------------------------------------------
@@ -586,7 +547,7 @@ densi
 ## Warning: Removed 18626 rows containing missing values (geom_point).
 ```
 
-![](week-6_figs/week-6_unnamed-chunk-12-1.png)<!-- -->
+![](week-6_figs/week-6_unnamed-chunk-11-1.png)<!-- -->
 
 Conclusions
 ===========
