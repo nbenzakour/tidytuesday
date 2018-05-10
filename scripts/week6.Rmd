@@ -1,0 +1,241 @@
+---
+title: "Tidytuesday"
+author: "Nouri L. BEN ZAKOUR"
+date: "9 May 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(knitr)
+library(skimr)
+library(data.table)
+library(janitor)
+
+#### geolocation
+library(rworldmap)
+
+library(ggmap)
+library(maps)
+library(maptools)
+library(sf)
+
+```
+Data prepping
+=============
+
+Possible update: could add function to load each indiv sheet
+
+```{r}
+
+# Loading data
+setwd("~/REPOS/tidytuesday/data")
+### data <- read_excel(file.choose(), na = "NA")
+data <- read_excel("week6_coffee_chains.xlsx", na = "")
+### by default loads the first sheet only
+### possible update: could add function to load each indiv sheet
+```
+
+First look into the data.
+Note: could clean up data but not required for next few steps.
+
+```{r}
+
+as_tibble(data)
+skim(data)
+```
+
+Add 2 columns giving City and Country frequency for each entry.
+
+```{r}
+
+### add 2 columns giving City and Country frequency for each entry
+dt = data.table(data)
+dt[, `freqCity` := .N, by = City]
+dt[, `freqCountry` := .N, by = Country]   ## not used further so far
+```
+
+Histograms for Countries and Cities
+-----------------------------------
+
+Not filtered. Needs works.
+```{r}
+#p1 <- ggplot(data=dtsort, aes(x = Country)) + geom_bar() 
+
+top_countries <- data %>% 
+  group_by(Country) %>% 
+  summarise(n = n()) %>%
+  arrange(desc(n)) %>%
+  filter(n > 1)
+
+p1 <- ggplot(data=top_countries, aes(x = reorder(Country, -n), y = n)) +
+  geom_bar(stat = "identity") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) #+
+  #scale_y_log10()
+p1
+
+##
+
+top_cities <- data %>% 
+  group_by(City) %>% 
+  summarise(n = n()) %>%
+  arrange(desc(n)) %>%
+  filter(n > 1)
+
+p2 <- ggplot(data=top_cities, aes(x = reorder(City, -n), y = n)) + 
+  geom_bar(stat = "identity")
+p2
+```
+
+
+Mapping
+=======
+
+Testing rworldmap for all Starbucks locations.
+---------------------------------------------
+
+```{r}
+### testing rworldmap
+newmap <- getMap(resolution = "high")
+plot(newmap)
+points(data$Longitude, dt$Latitude, col = "red", cex = .1)
+```
+
+Adding bubbles colored by count of Starbucks per city. 
+------------------------------------------------------
+
+**Possible update: average the longitudes and latitudes for all Starbucks in each city to have only one bubble per city sized by count.**
+
+```{r}
+### testing rworldmap and bubbles
+newmap <- getMap(resolution = "li")
+plot(newmap)
+points(dt$Longitude, dt$Latitude, col = "grey", cex = .1)
+
+mapBubbles(dt, nameX='Longitude', nameY='Latitude', nameZSize='freqCity', nameZColour='freqCity', fill=FALSE, addLegend=FALSE, add=TRUE)
+
+### issues
+```
+
+Testing map_data function in ggplot2
+------------------------------------
+
+```{r}
+## testing different maps style
+world_map <- map_data("world")
+p1 <- ggplot() + 
+  geom_polygon(data=world_map,aes(x=long, y=lat,group=group)) +
+  scale_y_continuous(breaks=seq(-80,80,by=20))
+p1
+
+p2 <- ggplot(world_map, aes(x=long, y=lat, group=group)) +
+  geom_path() +
+  scale_y_continuous(breaks=(-2:2) * 30) +
+  scale_x_continuous(breaks=(-4:4) * 45)
+p2
+```
+
+```{r}
+
+# reorder to overlay highest freqCity last
+# dtsort <- dt[with(dt, order(freqCity)),]
+dtsort <- dt %>% 
+  arrange(freqCity)
+
+p1 <- ggplot() + geom_polygon(data=world_map,aes(x=long, y=lat,group=group)) + scale_y_continuous(breaks=seq(-80,80,by=20)) + geom_point(data = dtsort, aes(x = Longitude, y = Latitude, colour = freqCity, alpha = 1/10)) + scale_colour_gradient(low="blue", high="red")
+p1
+
+## filter usa data only
+usa <- dtsort %>%
+  filter(Country == "US" | Country == "USA")
+
+p2 <- ggplot() + geom_polygon(data=world_map,aes(x=long, y=lat,group=group)) + scale_y_continuous(breaks=seq(-80,80,by=20)) + geom_point(data = usa, aes(x = Longitude, y = Latitude, colour = freqCity, alpha = 1/10)) + scale_colour_gradient(low="blue", high="red")
+p2
+
+## usa map only
+p3 <- ggplot() + geom_polygon(data=map_data("usa"),aes(x=long, y=lat,group=group)) + scale_y_continuous(breaks=seq(-80,80,by=20)) + geom_point(data = usa, aes(x = Longitude, y = Latitude, colour = freqCity, alpha = 1/10, shape = ".")) + scale_colour_gradient(low="blue", high="red")
+p3
+```
+
+
+Testing ggmap
+-------------
+
+In progress: issues displaying toner type maps. Can't control display zone very well. Can't reduce point size further.
+
+**ggmap sometimes returns an error when retrieving maps about query limit. Not reproducible**
+
+
+```{r}
+al1 = get_map(location = 'Europe', zoom = 2, color="color", maptype = "terrain")
+
+p1 <- ggmap(al1) + 
+  geom_point(data = dtsort, aes(x = Longitude, y = Latitude, colour = freqCity)) + 
+  scale_colour_gradient(low="blue", high="red")
+p1
+
+```
+
+Testing density overlay with ggmap (USA focused)
+------------------------------------------------
+
+Note: inspired by Freakonomics code.
+
+```{r}
+al2 = get_map(location = 'USA', zoom = 4, color="bw", maptype = "terrain")
+
+overlay <- stat_density2d(data = dtsort, aes(x = Longitude, y = Latitude, fill = ..level.., alpha = ..level..), contour = T, geom = "polygon", alpha = 0.3)
+points <- geom_point(data = dtsort, aes(x = Longitude, y = Latitude), size = 0.3) 
+
+densi <- ggmap(al2) + 
+  points +
+  overlay + 
+  scale_fill_gradient(low="blue", high="red")
+densi
+```
+
+Testing density overlay with ggmap (China focused)
+--------------------------------------------------
+
+```{r}
+al3 = get_map(location = 'China', zoom = 3, color="bw", maptype = "terrain")
+
+overlay <- stat_density2d(data = dtsort, aes(x = Longitude, y = Latitude, fill = ..level.., alpha = ..level..), contour = T, geom = "polygon", alpha = 0.3)
+points <- geom_point(data = dtsort, aes(x = Longitude, y = Latitude), size = 0.3) 
+
+densi <- ggmap(al3) + 
+  points +
+  overlay + 
+  scale_fill_gradient(low="blue", high="red")
+densi
+```
+
+Conclusions
+===========
+
+Further potential update
+------------------------
+
+* testing Choroplethr to color countries by count/frequencies, etc.
+* tidying graphs (add legends, colors etc.)
+* streamline data acquisition (other sheets containing info on other brands)
+
+Testing sourcing other data
+---------------------------
+
+* population density (interesting contrast USA/China/Europe)
+* climate data in the USA (when corrected for population density do we see more coffee places in cold places?)
+* can we predict where the next Starbuck should be built?
+
+
+
+
+
+
+
+
