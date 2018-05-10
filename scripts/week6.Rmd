@@ -2,11 +2,13 @@
 title: "Tidytuesday"
 author: "Nouri L. BEN ZAKOUR"
 date: "9 May 2018"
-output: html_document
+output: 
+  html_document:
+    keep_md: true
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(fig.path = "week-6_figs/week-6_")
 ```
 
 ```{r}
