@@ -19,170 +19,225 @@ library(skimr)
 library(data.table)
 library(janitor)
 
-#### geolocation
+#### geolocation 
 library(rworldmap)
-
 library(ggmap)
 library(maps)
 library(maptools)
 library(sf)
 
 ```
+**DISCLAIMER: the overall aim of this analysis was for me to learn and explore how to plot geographical maps using different approaches, overlay data points, visualise density, etc. Apologies in advance for any potential unvaluable missing comments or untidy code.**
+
+
 Data prepping
 =============
 
-Possible update: could add function to load each indiv sheet
 
 ```{r}
 
 # Loading data
-setwd("~/REPOS/tidytuesday/data")
+setwd("~/REPOS/tidytuesday/scripts")
 ### data <- read_excel(file.choose(), na = "NA")
-data <- read_excel("week6_coffee_chains.xlsx", na = "")
+data <- read_excel("../data/week6_coffee_chains.xlsx", na = "")
 ### by default loads the first sheet only
-### possible update: could add function to load each indiv sheet
+### possible update: add function to load each indiv sheet (2 other available in this dataset)
 ```
 
-First look into the data.
-Note: could clean up data but not required for next few steps.
+First look into the data. As I am mostly interesting in plotting maps here, I won't do much data cleaning beforehand.
 
 ```{r}
 
 as_tibble(data)
 skim(data)
-```
-
-Add 2 columns giving City and Country frequency for each entry.
-
-```{r}
-
 ### add 2 columns giving City and Country frequency for each entry
 dt = data.table(data)
 dt[, `freqCity` := .N, by = City]
-dt[, `freqCountry` := .N, by = Country]   ## not used further so far
 ```
 
+Possible updates: 
 
-Mapping
-=======
+* figure out how to import chinese-encoding city names properly
+* add function to load each indiv sheet to pull other coffee shops data
+
+
+Mapping with rworldmap
+======================
 
 Testing rworldmap for all Starbucks locations.
 ---------------------------------------------
 
-```{r}
+```{r, fig.height=7, fig.width=12}
 ### testing rworldmap
 newmap <- getMap(resolution = "high")
 plot(newmap)
-points(data$Longitude, dt$Latitude, col = "red", cex = .1)
+points(dt$Longitude, dt$Latitude, col = "red", cex = .1)
 ```
 
-Adding bubbles colored by count of Starbucks per city. 
-------------------------------------------------------
+This type of map is quite low resolution but does the trick in displaying the essential. 
+Note: I haven't spent any time optimising the esthetic or figuring out how to get rid of the large margins.
 
-**Possible update: average the longitudes and latitudes for all Starbucks in each city to have only one bubble per city sized by count.**
 
-```{r}
-### testing rworldmap and bubbles
+Combining data for each city using bubbles
+------------------------------------------
+
+Next I wanted to represent the data for each city. To do this, I grouped the data by city and country (as city names may be the same in different countries, example Dublin, IE and Dublin, US), then averaged the longitudes and latitudes of all Starbucks in each city. Each city corresponds to a bubble which size is proportional to counts.
+
+```{r, fig.height=7, fig.width=12}
+### making map
 newmap <- getMap(resolution = "li")
 plot(newmap)
-points(dt$Longitude, dt$Latitude, col = "grey", cex = .1)
 
-mapBubbles(dt, nameX='Longitude', nameY='Latitude', nameZSize='freqCity', nameZColour='freqCity', fill=FALSE, addLegend=FALSE, add=TRUE)
+### Long and Lat averaged by city + freq
+### Note: group by city and country for cities names present in more than one country. Example Dublin, IE and Dublin, US.
 
-### issues
+dt_city <- dt %>% 
+  group_by(City, Country) %>% 
+  summarise(
+    avgLong = as.numeric(mean(Longitude)), 
+    avgLat = as.numeric(mean(Latitude)),
+    n = n()
+    )%>% 
+  arrange(desc(n))
+dt_city <- as.data.frame(dt_city)
+
+mapBubbles(dt_city, nameX='avgLong', nameY='avgLat', nameZSize='n', nameZColour='n', fill=FALSE, addLegend=FALSE, add=TRUE)
 ```
 
-Testing map_data function in ggplot2
-------------------------------------
 
-```{r}
+Testing map_data function in ggplot2
+====================================
+
+Overall, I found the maps from rworldmap pretty ugly in general, so decided to check out map_data from ggplot. Here are some examples of the types of maps available.
+
+```{r, fig.height=7, fig.width=11.5}
 ## testing different maps style
 world_map <- map_data("world")
-p1 <- ggplot() + 
+mp1 <- ggplot() + 
   geom_polygon(data=world_map,aes(x=long, y=lat,group=group)) +
   scale_y_continuous(breaks=seq(-80,80,by=20))
+p1 <- mp1 + xlab("Longitude") +
+  ylab("Latitude") +
+  ggtitle("World map using geom_polygon")
 p1
 
-p2 <- ggplot(world_map, aes(x=long, y=lat, group=group)) +
+
+mp2 <- ggplot(world_map, aes(x=long, y=lat, group=group)) +
   geom_path() +
   scale_y_continuous(breaks=(-2:2) * 30) +
-  scale_x_continuous(breaks=(-4:4) * 45)
+  scale_x_continuous(breaks=(-4:4) * 45) +
+  coord_fixed( ratio = 1)
+p2 <- mp2 + xlab("Longitude") +
+  ylab("Latitude") +
+  ggtitle("World map using geom_path")
 p2
 ```
 
-```{r}
+Plotting points and bubbles in ggplot2
+--------------------------------------
+
+Here I displayed the same information as before, displaying:
+
+* each starbuck individually (using points) 
+* pooled by city (using bubbles)
+
+```{r, fig.height=7, fig.width=11.5}
 
 # reorder to overlay highest freqCity last
 # dtsort <- dt[with(dt, order(freqCity)),]
 dtsort <- dt %>% 
   arrange(freqCity)
 
-p1 <- ggplot() + geom_polygon(data=world_map,aes(x=long, y=lat,group=group)) + scale_y_continuous(breaks=seq(-80,80,by=20)) + geom_point(data = dtsort, aes(x = Longitude, y = Latitude, colour = freqCity, alpha = 1/10)) + scale_colour_gradient(low="blue", high="red")
+## world
+p1 <- mp1 + 
+  geom_point(data = dtsort, aes(x = Longitude, y = Latitude, alpha = 1/10), colour = "red") +
+  xlab("Longitude") +
+  ylab("Latitude") +
+  ggtitle("Distribution of Starbucks around the World", subtitle = "geom_polygon map")
 p1
 
-## filter usa data only
+## average coord per city
+
+p2 <- mp1 + 
+  geom_point(data = (dt_city %>% arrange(n)), aes(x = avgLong, y = avgLat, colour = n, alpha = 1/10, size = n)) + 
+  scale_colour_gradient(low="blue", high="red") +
+  xlab("Longitude") +
+  ylab("Latitude") +
+  ggtitle("Distribution of Starbucks around the World by City", subtitle = "geom_polygon map")
+p2
+
+```
+
+
+Focusing on particular regions - Example of the US
+--------------------------------------------------
+
+Not that I am a geography expert but it seems that specifying "USA" excludes Alaska and Hawai for some reasons...
+
+```{r, fig.height=7, fig.width=11.5}
+## filter usa data only and usa map only
 usa <- dtsort %>%
   filter(Country == "US" | Country == "USA")
 
-p2 <- ggplot() + geom_polygon(data=world_map,aes(x=long, y=lat,group=group)) + scale_y_continuous(breaks=seq(-80,80,by=20)) + geom_point(data = usa, aes(x = Longitude, y = Latitude, colour = freqCity, alpha = 1/10)) + scale_colour_gradient(low="blue", high="red")
-p2
-
-## usa map only
-p3 <- ggplot() + geom_polygon(data=map_data("usa"),aes(x=long, y=lat,group=group)) + scale_y_continuous(breaks=seq(-80,80,by=20)) + geom_point(data = usa, aes(x = Longitude, y = Latitude, colour = freqCity, alpha = 1/10, shape = ".")) + scale_colour_gradient(low="blue", high="red")
+p3 <- ggplot() + 
+  geom_polygon(data = map_data("usa"), aes(x = long, y = lat, group = group)) + 
+  scale_y_continuous(breaks = seq(-80, 80, by = 20)) + 
+  geom_point(data = usa, aes(x = Longitude, y = Latitude, colour = freqCity, alpha = 1/10, shape = ".")) + 
+  scale_colour_gradient(low = "blue", high = "red") +
+  xlab("Longitude") +
+  ylab("Latitude") +
+  ggtitle("Distribution of Starbucks in the USA", subtitle = "geom_path map")
 p3
+
 ```
 
 
 Testing ggmap
--------------
+=============
 
 In progress: issues displaying toner type maps. Can't control display zone very well. Can't reduce point size further.
 
 **ggmap sometimes returns an error when retrieving maps about query limit. Not reproducible**
 
 
-```{r}
-al1 = get_map(location = 'Europe', zoom = 2, color="color", maptype = "terrain")
-
-p1 <- ggmap(al1) + 
-  geom_point(data = dtsort, aes(x = Longitude, y = Latitude, colour = freqCity)) + 
-  scale_colour_gradient(low="blue", high="red")
-p1
-
-```
-
 Testing density overlay with ggmap (USA focused)
 ------------------------------------------------
 
-Note: inspired by Freakonomics code.
+It was my first time plotting a density overlay, so this probably needs more reading and work on my side but will have to be my favorite representation on this dataset so far.
 
-```{r}
-al2 = get_map(location = 'USA', zoom = 4, color="bw", maptype = "terrain")
+```{r, fig.height=10, fig.width=12}
+gg1 <- get_map(location = 'USA', zoom = 3, color="bw", maptype = "terrain")
 
-overlay <- stat_density2d(data = dtsort, aes(x = Longitude, y = Latitude, fill = ..level.., alpha = ..level..), contour = T, geom = "polygon", alpha = 0.3)
+overlay <- stat_density2d(data = dtsort, aes(x = Longitude, y = Latitude, fill = ..level.., alpha = ..level..), contour = T, geom = "polygon", alpha = 0.05, binwidth = 0.0001)
 points <- geom_point(data = dtsort, aes(x = Longitude, y = Latitude), size = 0.3) 
 
-densi <- ggmap(al2) + 
-  points +
+density <- ggmap(gg1) + 
   overlay + 
-  scale_fill_gradient(low="blue", high="red")
-densi
+  points +
+  scale_fill_gradient(low="blue", high="red") +
+  xlab("Longitude") +
+  ylab("Latitude") +
+  ggtitle("Distribution and density of Starbucks in the North America region", subtitle = "ggmap")
+density
 ```
 
 Testing density overlay with ggmap (China focused)
 --------------------------------------------------
 
-```{r}
-al3 = get_map(location = 'China', zoom = 3, color="bw", maptype = "terrain")
+```{r, fig.height=10, fig.width=12}
+gg2 <- get_map(location = 'China', zoom = 3, color="bw", maptype = "terrain")
 
-overlay <- stat_density2d(data = dtsort, aes(x = Longitude, y = Latitude, fill = ..level.., alpha = ..level..), contour = T, geom = "polygon", alpha = 0.3)
+overlay <- stat_density2d(data = dtsort, aes(x = Longitude, y = Latitude, fill = ..level.., alpha = ..level..), contour = T, geom = "polygon", alpha = 0.05, binwidth = 0.0001)
 points <- geom_point(data = dtsort, aes(x = Longitude, y = Latitude), size = 0.3) 
 
-densi <- ggmap(al3) + 
-  points +
+density <- ggmap(gg2) +
   overlay + 
-  scale_fill_gradient(low="blue", high="red")
-densi
+  points +
+  scale_fill_gradient(low = "blue", high = "red") +
+  xlab("Longitude") +
+  ylab("Latitude") +
+  ggtitle("Distribution and density of Starbucks in the East Asia region", subtitle = "ggmap")
+density
 ```
 
 Conclusions
