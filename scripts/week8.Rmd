@@ -2,7 +2,7 @@
 title: "week8"
 author: "Nouri L. BEN ZAKOUR"
 date: "24 May 2018"
-output: html_document
+output: md_document
 ---
 
 ```{r setup, include=FALSE}
