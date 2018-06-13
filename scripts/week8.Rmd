@@ -1,0 +1,94 @@
+---
+title: "week8"
+author: "Nouri L. BEN ZAKOUR"
+date: "24 May 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.path = "week-8_figs/week-8_")
+```
+
+```{r}
+library(tidyverse)
+library(knitr)
+library(skimr)
+library(data.table)
+library(viridis)
+
+#### geolocation 
+library(ggmap)
+library(choroplethr)
+```
+
+Loading cleaned data
+--------------------
+
+For this challenge, I had little and decided to go with the cleaned data.
+
+```{r}
+
+# Loading data
+setwd("~/REPOS/tidytuesday/scripts")
+### data <- read_excel(file.choose(), na = "NA")
+data <- read_csv("../data/honeyproduction.csv", na = "")
+```
+
+```{r}
+head(data)
+skim(data)
+```
+
+Honey production trends
+-----------------------
+
+Among all tables from the original article, I was interested in seeing the evolution of honey production over time.
+
+```{r}
+by_year <- data %>%
+  group_by(year) %>%
+  summarise(
+    tot_totalprod = sum(totalprod),      # annual total honey production
+    avg_yieldpercol = mean(yieldpercol), # annual average yield per colony
+    tot_numcol = sum(numcol)
+  )
+by_year
+```
+
+```{r, fig.height=5, fig.width=9}
+ggplot(data=by_year) +
+  geom_point(aes(x = year, y = avg_yieldpercol, size = avg_yieldpercol, colour = avg_yieldpercol), show.legend = TRUE, shape = 19) + # plotting yield data as points
+  labs(size="Yield per colony", colour="Yield per colony", caption = "Source data: Department Of Agriculture’s National Agricultural Statistics Service Annual Honey Report") + 
+  geom_line(aes(x = year, y = tot_totalprod/3000000)) + # plotting production data as a straight line, transformed to match the range of the first y-axis
+  scale_y_continuous(sec.axis = sec_axis(~.*3, name = "Total production in million")) + # add second y-axis and revert the above transformation
+  scale_color_viridis(option = "viridis") + # colour with viridis palette 
+  ggtitle("Honey yield per colony vs Total production in the USA (1998-2012)") +
+  theme(plot.title = element_text(hjust = 0.5), plot.caption = element_text(hjust = 0)) +
+  xlab("Year") +
+  ylab("Average Yield per colony")
+````
+
+Total production and yield do decrease over the years but what I did find interesting was 2009 with particularly low production. Could this be in any way related to GFC?
+
+On a technical side, plotting a second y-axis turned out not to be that straight forward in ggplot2! To do so here, as the second dataset is in a different range, [50-80] vs millions, I had to transform the values of total production to match the range of honey yield.
+
+```{r, fig.height=5, fig.width=9}
+ggplot(data=by_year) +
+  geom_point(aes(x = year, y = avg_yieldpercol, size = avg_yieldpercol, colour = avg_yieldpercol), show.legend = TRUE, shape = 19) +
+  labs(size="Yield per colony", colour="Yield per colony", caption = "Source data: Department Of Agriculture’s National Agricultural Statistics Service Annual Honey Report") +
+  geom_line(aes(x = year, y = tot_numcol/40000)) + # plotting colony data as a straight line, transformed to match the range of the first y-axis
+  scale_y_continuous(sec.axis = sec_axis(~.*0.04, name = "Total number of bee colonies (in million)")) + # add second y-axis and revert the above transformation
+  scale_color_viridis(option = "inferno") +
+  ggtitle("Honey yield per colony vs Total number of colonies in the USA (1998-2012)") +
+  theme(plot.title = element_text(hjust = 0.5), plot.caption = element_text(hjust = 0)) +
+  xlab("Year") +
+  ylab("Average Yield per colony")
+````
+
+While honey production and yield per colonies did go down in the first graph, here the number of total colonies remain quite stable, in particular from 2009 (with the max recorded for 2010). What this data is missing is the size of colonies. Are they smaller nowadays? Or are they simply not as much productive as they used to?
+
+Conclusion
+----------
+
+I didn't do much more on this challenge as I went on bit of a tangent. I was really interested in finding evidence that a reduction of habitat could be associated with the reduction of honey production. I spent a lot of time looking for historical satellite images or vegetation maps onto which I could visualise the difference in yield over time. While there are a lot of resources for this, I could not find any readily available in an R package like ggmap or similar. I'll keep an eye for alternatives although this goes a bit beyond the scope of this exercise.
+
